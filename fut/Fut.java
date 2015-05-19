@@ -1,5 +1,6 @@
 package fut;
 import robocode.*;
+import java.awt.geom.*;
 //import java.awt.Color;
 
 // API help : http://robocode.sourceforge.net/docs/robocode/robocode/Robot.html
@@ -15,6 +16,8 @@ public class Fut extends AdvancedRobot
 	 * run: Fut's default behavior
 	 */
 	double[] rlocation;
+	int lastDetectionTicks = 100;
+	AdvancedEnemyBot enemy = new AdvancedEnemyBot();
 	public void run() {
 		// Initialization of the robot should be put here
 
@@ -28,18 +31,26 @@ public class Fut extends AdvancedRobot
 		// Robot main loop
 		setAdjustRadarForRobotTurn(true);
 		int radarDirection = 1;
+		
 		while(true)
 		{
-			//turnRadarLeftRadians(2*Math.PI/6);
-			if (getRadarTurnRemaining() == 0)
+			if(lastDetectionTicks<15)
 			{
-				double turn = getHeading() - getRadarHeading() + enemyBearing;
-				turn += 20 * radarDirection;
-				radarDirection *= -1;
-				
-				setTurnRadarRight(normalizeBearing(turn));
+				lastDetectionTicks++;
+				if (getRadarTurnRemaining() == 0)
+				{
+					double turn = getHeading() - getRadarHeading() + enemyBearing;
+					turn += 20 * radarDirection;
+					radarDirection *= -1;
+					
+					setTurnRadarRight(normalizeBearing(turn));
+				}
 			}
-			
+			else//Robot not detected for 100 ticks
+			{
+			System.out.println("Robot not detected for "+lastDetectionTicks+" ticks.");
+			turnRadarLeft(360);
+			}
 			execute();
 		}
 	}
@@ -50,21 +61,60 @@ public class Fut extends AdvancedRobot
 		while (angle < -180) angle += 360;
 		return angle;
 	}
-
+	// computes the absolute bearing between two points
+	double absoluteBearing(double x1, double y1, double x2, double y2) {
+		double xo = x2-x1;
+		double yo = y2-y1;
+		double hyp = Point2D.distance(x1, y1, x2, y2);
+		double arcSin = Math.toDegrees(Math.asin(xo / hyp));
+		double bearing = 0;
+	
+		if (xo > 0 && yo > 0) { // both pos: lower-Left
+			bearing = arcSin;
+		} else if (xo < 0 && yo > 0) { // x neg, y pos: lower-right
+			bearing = 360 + arcSin; // arcsin is negative here, actuall 360 - ang
+		} else if (xo > 0 && yo < 0) { // x pos, y neg: upper-left
+			bearing = 180 - arcSin;
+		} else if (xo < 0 && yo < 0) { // both neg: upper-right
+			bearing = 180 - arcSin; // arcsin is negative here, actually 180 + ang
+		}
+	
+		return bearing;
+	}
 	/**
 	 * onScannedRobot: What to do when you see another robot
 	 */
 	public void onScannedRobot(ScannedRobotEvent e) {
-	
+		enemy.update(e);
 		enemyBearing = e.getBearing();
-		
-		if(getHeading() - enemyBearing > 0)
-		turnGunRight(5);
-		else
-		turnGunLeft(5);
+		lastDetectionTicks = 0;
 		//fire(Math.random()*3);
-		rlocation = new double[]{e.getDistance()*Math.cos(e.getBearingRadians()),e.getDistance()*Math.sin(e.getBearingRadians())};
-	System.out.println(rlocation[0]+", "+rlocation[1]);
+		//System.out.println(rlocation[0]+", "+rlocation[1]);
+		
+	
+		// calculate firepower based on distance
+		double firePower = Math.min(500 / enemy.getDistance(), 3);
+		// calculate speed of bullet
+		double bulletSpeed = 20 - firePower * 3;
+		// distance = rate * time, solved for time
+		long time = (long)(enemy.getDistance() / bulletSpeed);
+		
+		if ( enemy.none() || e.getDistance() < enemy.getDistance() - 70 ||
+			e.getName().equals(enemy.getName())) {
+
+		// track him using the NEW update method
+		enemy.update(e, this);
+		// calculate gun turn to predicted x,y location
+		double futureX = enemy.getFutureX(time);
+		double futureY = enemy.getFutureY(time);
+		double absDeg = absoluteBearing(getX(), getY(), futureX, futureY);
+		// turn the gun to the predicted x,y location
+		setTurnGunRight(normalizeBearing(absDeg - getGunHeading()));
+		}
+		if(getHeading() - getGunHeading() + e.getBearing()<5)
+		fire(1);
+		else
+		System.out.println("Not in range");
 	}
 
 	/**
