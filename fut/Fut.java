@@ -15,9 +15,9 @@ public class Fut extends AdvancedRobot
 	/**
 	 * run: Fut's default behavior
 	 */
-	double[] rlocation;
 	int lastDetectionTicks = 100;
 	AdvancedEnemyBot enemy = new AdvancedEnemyBot();
+	private byte moveDirection = 1;
 	public void run() {
 		// Initialization of the robot should be put here
 
@@ -34,6 +34,7 @@ public class Fut extends AdvancedRobot
 		
 		while(true)
 		{
+			//Radar and Firing
 			if(lastDetectionTicks<15)
 			{
 				lastDetectionTicks++;
@@ -46,50 +47,22 @@ public class Fut extends AdvancedRobot
 					setTurnRadarRight(normalizeBearing(turn));
 				}
 			}
-			else//Robot not detected for 100 ticks
+			else//Robot not detected for x ticks
 			{
 			System.out.println("Robot not detected for "+lastDetectionTicks+" ticks.");
 			turnRadarLeft(360);
 			}
 			execute();
+			
+			//Moving
+			doMove();
 		}
 	}
-	
-	public double normalizeBearing(double angle)
-	{
-		while (angle > 180) angle -= 360;
-		while (angle < -180) angle += 360;
-		return angle;
-	}
-	// computes the absolute bearing between two points
-	double absoluteBearing(double x1, double y1, double x2, double y2) {
-		double xo = x2-x1;
-		double yo = y2-y1;
-		double hyp = Point2D.distance(x1, y1, x2, y2);
-		double arcSin = Math.toDegrees(Math.asin(xo / hyp));
-		double bearing = 0;
-	
-		if (xo > 0 && yo > 0) { // both pos: lower-Left
-			bearing = arcSin;
-		} else if (xo < 0 && yo > 0) { // x neg, y pos: lower-right
-			bearing = 360 + arcSin; // arcsin is negative here, actuall 360 - ang
-		} else if (xo > 0 && yo < 0) { // x pos, y neg: upper-left
-			bearing = 180 - arcSin;
-		} else if (xo < 0 && yo < 0) { // both neg: upper-right
-			bearing = 180 - arcSin; // arcsin is negative here, actually 180 + ang
-		}
-	
-		return bearing;
-	}
-	/**
-	 * onScannedRobot: What to do when you see another robot
-	 */
+
 	public void onScannedRobot(ScannedRobotEvent e) {
 		enemy.update(e);
 		enemyBearing = e.getBearing();
 		lastDetectionTicks = 0;
-		//fire(Math.random()*3);
-		//System.out.println(rlocation[0]+", "+rlocation[1]);
 		
 	
 		// calculate firepower based on distance
@@ -111,10 +84,10 @@ public class Fut extends AdvancedRobot
 		// turn the gun to the predicted x,y location
 		setTurnGunRight(normalizeBearing(absDeg - getGunHeading()));
 		}
-		if(getHeading() - getGunHeading() + e.getBearing()<5)
-		fire(1);
-		else
-		System.out.println("Not in range");
+		//if(getHeading() - getGunHeading() + e.getBearing()<10)
+		fire(firePower);
+	//	else
+		//System.out.println("Not in range");
 	}
 
 	/**
@@ -122,7 +95,9 @@ public class Fut extends AdvancedRobot
 	 */
 	public void onHitByBullet(HitByBulletEvent e) {
 		// Replace the next line with any behavior you would like
-		back(10);
+		setTurnRight(enemy.getBearing() - 90);
+		moveDirection*=-1;
+		setAhead(150 * moveDirection);
 	}
 	
 	/**
@@ -130,6 +105,54 @@ public class Fut extends AdvancedRobot
 	 */
 	public void onHitWall(HitWallEvent e) {
 		// Replace the next line with any behavior you would like
+		setTurnRight(90);
 		ahead(20);
+		
+	}
+	
+	public void update()
+	{
+		
+	}
+	
+	public void doMove() {
+	
+		// always square off against our enemy
+		setTurnRight(enemy.getBearing() + 90);
+	
+		// strafe by changing direction every 20 ticks
+		if (getTime() % 20 == 0) {
+			moveDirection *= -1;
+			setAhead(150 * moveDirection);
+		}
 	}	
+	//----------------------------------------------------------------------------
+	public double normalizeBearing(double angle)
+	{
+		while (angle > 180) angle -= 360;
+		while (angle < -180) angle += 360;
+		return angle;
+	}
+	// computes the absolute bearing between two points
+
+	double absoluteBearing(double x1, double y1, double x2, double y2) {
+		double xo = x2-x1;
+		double yo = y2-y1;
+		double hyp = Point2D.distance(x1, y1, x2, y2);
+		double arcSin = Math.toDegrees(Math.asin(xo / hyp));
+		double bearing = 0;
+	
+		if (xo > 0 && yo > 0) { // both pos: lower-Left
+			bearing = arcSin;
+		} else if (xo < 0 && yo > 0) { // x neg, y pos: lower-right
+			bearing = 360 + arcSin; // arcsin is negative here, actuall 360 - ang
+		} else if (xo > 0 && yo < 0) { // x pos, y neg: upper-left
+			bearing = 180 - arcSin;
+		} else if (xo < 0 && yo < 0) { // both neg: upper-right
+			bearing = 180 - arcSin; // arcsin is negative here, actually 180 + ang
+		}
+	
+		return bearing;
+	}
+	//-------------------------------------------------------------------------------------------------
 }
